@@ -48,6 +48,10 @@ Puppet::Type.newtype(:shellvar) do
     end
   end
 
+  newparam(:name) do
+    desc "The default namevar"
+  end
+
   newparam(:variable) do
     desc "The name of the variable, e.g. OPTIONS"
     isnamevar
@@ -61,20 +65,18 @@ Puppet::Type.newtype(:shellvar) do
     end
 
     def insync?(is)
-      if provider.resource[:array_append]
-        should_arr = Array(should)
+      should_arr = Array(should)
 
-        # Join and split to ensure all elements are parsed
-        is_str = is.is_a?(Array) ? is.join(' ') : is
-        is_arr = is_str.split(' ')
+      # Join and split to ensure all elements are parsed
+      is_str = is.is_a?(Array) ? is.join(' ') : is
+      is_arr = is_str.split(' ')
+
+      if provider.resource[:array_append]
         (should_arr - is_arr).empty?
+      elsif should.size > 1
+        should_arr == is_arr
       else
-        case provider.array_type
-        when :string
-          is == Array(should.join(' '))
-        when :array
-          is == should
-        end
+        should == is
       end
     end
 
@@ -149,6 +151,7 @@ Puppet::Type.newtype(:shellvar) do
 
   newparam(:target) do
     desc "The file in which to store the variable."
+    isnamevar
   end
 
   newproperty(:comment) do
@@ -157,9 +160,9 @@ Puppet::Type.newtype(:shellvar) do
 
   newparam(:uncomment) do
     desc "Whether to remove commented value when found."
-    
+
     newvalues :true, :false
-    
+
     defaultto :false
 
     munge do |v|
@@ -170,6 +173,33 @@ Puppet::Type.newtype(:shellvar) do
         :false
       end
     end
+  end
+
+  def self.title_patterns
+    identity = lambda { |x| x }
+    [
+      [
+        /^((\S+)\s+in\s+(\S+))$/,
+        [
+          [ :name, identity ],
+          [ :variable, identity ],
+          [ :target, identity ]
+        ]
+      ],
+      [
+        /((\S+))/,
+        [
+          [ :name, identity ],
+          [ :variable, identity ]
+        ]
+      ],
+      [
+        /(.*)/,
+        [
+          [ :name, identity ]
+        ]
+      ]
+    ]
   end
 
   autorequire(:file) do
